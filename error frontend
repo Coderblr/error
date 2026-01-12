@@ -2,182 +2,206 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<title>Error Code Assistant</title>
+<title>Error Insight Assistant</title>
 
 <style>
 :root {
-  --bg: #f4f6f8;
-  --card: #ffffff;
-  --text: #222;
-  --accent: #2563eb;
-  --border: #ddd;
+  --bg-gradient: linear-gradient(135deg, #667eea, #764ba2);
+  --sidebar-bg: #0f172a;
+  --chat-bg: #f8fafc;
+  --user-bubble: #4f46e5;
+  --bot-bubble: #e5e7eb;
+  --text-dark: #111827;
+  --text-light: #f9fafb;
 }
 
 body.dark {
-  --bg: #0f172a;
-  --card: #1e293b;
-  --text: #e5e7eb;
-  --border: #334155;
+  --chat-bg: #0b1220;
+  --bot-bubble: #1e293b;
+  --text-dark: #f9fafb;
 }
 
 body {
   margin: 0;
-  background: var(--bg);
-  font-family: "Segoe UI", sans-serif;
-  color: var(--text);
+  font-family: "Segoe UI", system-ui;
+  background: var(--bg-gradient);
+  height: 100vh;
 }
 
-.container {
-  max-width: 900px;
-  margin: 30px auto;
-  background: var(--card);
-  border-radius: 10px;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+.app {
+  display: flex;
+  height: 100vh;
+}
+
+/* ===== SIDEBAR ===== */
+.sidebar {
+  width: 280px;
+  background: var(--sidebar-bg);
+  color: white;
   display: flex;
   flex-direction: column;
-  height: 85vh;
+  padding: 20px;
 }
 
-.header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 16px 20px;
-  border-bottom: 1px solid var(--border);
+.sidebar h2 {
+  margin: 0 0 10px;
 }
 
-.header h2 {
-  margin: 0;
+.sidebar img {
+  width: 100%;
+  border-radius: 12px;
+  margin: 15px 0;
+}
+
+.history {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.history-item {
+  padding: 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  background: #1e293b;
+  margin-bottom: 8px;
+  font-size: 14px;
+}
+
+.history-item:hover {
+  background: #334155;
 }
 
 .toggle {
-  cursor: pointer;
-  padding: 6px 12px;
-  border-radius: 6px;
-  background: var(--accent);
-  color: white;
+  background: #6366f1;
   border: none;
+  color: white;
+  padding: 10px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+/* ===== CHAT AREA ===== */
+.chat-area {
+  flex: 1;
+  background: var(--chat-bg);
+  display: flex;
+  flex-direction: column;
+}
+
+.chat-header {
+  padding: 16px;
+  border-bottom: 1px solid #e5e7eb;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
 .chat {
   flex: 1;
-  padding: 20px;
+  padding: 30px;
   overflow-y: auto;
 }
 
-.msg {
-  margin-bottom: 15px;
+.message {
+  max-width: 70%;
+  margin-bottom: 20px;
+  line-height: 1.5;
 }
 
-.msg.user {
-  text-align: right;
+.user {
+  margin-left: auto;
 }
 
-.msg.user .bubble {
-  background: var(--accent);
+.user .bubble {
+  background: var(--user-bubble);
   color: white;
+  border-radius: 18px 18px 4px 18px;
 }
 
-.msg.bot .bubble {
-  background: var(--border);
+.bot .bubble {
+  background: var(--bot-bubble);
+  color: var(--text-dark);
+  border-radius: 18px 18px 18px 4px;
 }
 
 .bubble {
-  display: inline-block;
-  padding: 12px 15px;
-  border-radius: 8px;
-  max-width: 80%;
+  padding: 14px 18px;
+  font-size: 15px;
   white-space: pre-wrap;
 }
 
-.copy-btn {
-  margin-top: 5px;
+.copy {
   font-size: 12px;
   cursor: pointer;
-  color: var(--accent);
+  margin-top: 6px;
+  color: #6366f1;
 }
 
-.footer {
-  padding: 15px;
-  border-top: 1px solid var(--border);
+/* ===== INPUT ===== */
+.input-area {
+  padding: 20px;
+  border-top: 1px solid #e5e7eb;
   display: flex;
   gap: 10px;
 }
 
 input {
   flex: 1;
-  padding: 12px;
+  padding: 14px;
   font-size: 16px;
+  border-radius: 12px;
+  border: 1px solid #d1d5db;
 }
 
 button.send {
-  background: var(--accent);
+  padding: 14px 20px;
+  background: #4f46e5;
   color: white;
   border: none;
-  padding: 12px 18px;
+  border-radius: 12px;
   cursor: pointer;
-  border-radius: 6px;
-}
-
-.history {
-  padding: 10px;
-  border-top: 1px solid var(--border);
-  background: var(--card);
-}
-
-.history span {
-  cursor: pointer;
-  margin-right: 10px;
-  font-size: 13px;
-  color: var(--accent);
-}
-
-.suggestions {
-  position: absolute;
-  background: var(--card);
-  border: 1px solid var(--border);
-  width: calc(100% - 40px);
-  max-height: 150px;
-  overflow-y: auto;
-  z-index: 10;
-}
-
-.suggestions div {
-  padding: 8px;
-  cursor: pointer;
-}
-
-.suggestions div:hover {
-  background: var(--border);
 }
 </style>
 </head>
 
 <body>
-<div class="container">
-  <div class="header">
-    <h2>Error Code Assistant</h2>
+<div class="app">
+
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <h2>Error Insight</h2>
+    <p style="font-size:13px;color:#cbd5f5">
+      Know your error & solution
+    </p>
+
+    <img src="https://illustrations.popsy.co/gray/chatting.svg" />
+
+    <div class="history" id="history"></div>
+
     <button class="toggle" onclick="toggleTheme()">🌙 / ☀</button>
   </div>
 
-  <div class="chat" id="chat"></div>
-
-  <div class="history" id="history"></div>
-
-  <div class="footer">
-    <div style="position:relative;flex:1">
-      <input id="input" placeholder="Enter error code..." oninput="suggest()" onkeydown="if(event.key==='Enter')send()" />
-      <div class="suggestions" id="suggestions"></div>
+  <!-- CHAT AREA -->
+  <div class="chat-area">
+    <div class="chat-header">
+      <strong>Error Assistant</strong>
     </div>
-    <button class="send" onclick="send()">Send</button>
+
+    <div class="chat" id="chat"></div>
+
+    <div class="input-area">
+      <input id="input" placeholder="Ask an error code or issue..."
+             onkeydown="if(event.key==='Enter')send()" />
+      <button class="send" onclick="send()">Send</button>
+    </div>
   </div>
+
 </div>
 
 <script>
 const chat = document.getElementById("chat");
 const input = document.getElementById("input");
 const historyDiv = document.getElementById("history");
-const suggestionsDiv = document.getElementById("suggestions");
 
 let history = JSON.parse(localStorage.getItem("history") || "[]");
 
@@ -185,34 +209,36 @@ function toggleTheme() {
   document.body.classList.toggle("dark");
 }
 
-function addMsg(role, text, copy=false) {
-  const div = document.createElement("div");
-  div.className = `msg ${role}`;
+function addMessage(role, text, copy=false) {
+  const msg = document.createElement("div");
+  msg.className = `message ${role}`;
+
   const bubble = document.createElement("div");
   bubble.className = "bubble";
   bubble.innerHTML = text;
 
-  div.appendChild(bubble);
+  msg.appendChild(bubble);
 
   if (copy) {
-    const copyBtn = document.createElement("div");
-    copyBtn.className = "copy-btn";
-    copyBtn.innerText = "📋 Copy";
-    copyBtn.onclick = () => navigator.clipboard.writeText(bubble.innerText);
-    div.appendChild(copyBtn);
+    const c = document.createElement("div");
+    c.className = "copy";
+    c.innerText = "📋 Copy";
+    c.onclick = () => navigator.clipboard.writeText(bubble.innerText);
+    msg.appendChild(c);
   }
 
-  chat.appendChild(div);
+  chat.appendChild(msg);
   chat.scrollTop = chat.scrollHeight;
 }
 
 function renderHistory() {
-  historyDiv.innerHTML = "History: ";
+  historyDiv.innerHTML = "";
   history.forEach(h => {
-    const span = document.createElement("span");
-    span.innerText = h;
-    span.onclick = () => input.value = h;
-    historyDiv.appendChild(span);
+    const div = document.createElement("div");
+    div.className = "history-item";
+    div.innerText = h;
+    div.onclick = () => input.value = h;
+    historyDiv.appendChild(div);
   });
 }
 
@@ -220,55 +246,24 @@ async function send() {
   const msg = input.value.trim();
   if (!msg) return;
 
-  addMsg("user", msg);
+  addMessage("user", msg);
   input.value = "";
-  suggestionsDiv.innerHTML = "";
 
-  history = [msg, ...history.filter(h => h !== msg)].slice(0, 5);
+  history = [msg, ...history.filter(x => x !== msg)].slice(0, 8);
   localStorage.setItem("history", JSON.stringify(history));
   renderHistory();
 
   try {
     const res = await fetch("/api/chat", {
       method: "POST",
-      headers: {"Content-Type":"application/json"},
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ message: msg })
     });
     const data = await res.json();
-    addMsg("bot", data.response, true);
+    addMessage("bot", data.response, true);
   } catch {
-    addMsg("bot", "Server error");
+    addMessage("bot", "Server error");
   }
-}
-
-async function suggest() {
-  const q = input.value.trim();
-  if (!q) {
-    suggestionsDiv.innerHTML = "";
-    return;
-  }
-
-  try {
-    const res = await fetch("/api/chat", {
-      method: "POST",
-      headers: {"Content-Type":"application/json"},
-      body: JSON.stringify({ message: q })
-    });
-    const data = await res.json();
-
-    suggestionsDiv.innerHTML = "";
-    if (data.type === "fuzzy_match") {
-      data.data.results.forEach(r => {
-        const div = document.createElement("div");
-        div.innerText = r.errorcode || r.code || "Suggestion";
-        div.onclick = () => {
-          input.value = div.innerText;
-          suggestionsDiv.innerHTML = "";
-        };
-        suggestionsDiv.appendChild(div);
-      });
-    }
-  } catch {}
 }
 
 renderHistory();
