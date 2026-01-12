@@ -2,271 +2,167 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<title>Error Insight Assistant</title>
+<title>Error Resolution Center</title>
 
 <style>
-:root {
-  --bg-gradient: linear-gradient(135deg, #667eea, #764ba2);
-  --sidebar-bg: #0f172a;
-  --chat-bg: #f8fafc;
-  --user-bubble: #4f46e5;
-  --bot-bubble: #e5e7eb;
-  --text-dark: #111827;
-  --text-light: #f9fafb;
-}
-
-body.dark {
-  --chat-bg: #0b1220;
-  --bot-bubble: #1e293b;
-  --text-dark: #f9fafb;
-}
-
 body {
   margin: 0;
-  font-family: "Segoe UI", system-ui;
-  background: var(--bg-gradient);
-  height: 100vh;
+  font-family: "Segoe UI", system-ui, sans-serif;
+  background: linear-gradient(135deg, #eef2ff, #f8fafc);
+  color: #1f2937;
 }
 
-.app {
+.container {
+  max-width: 900px;
+  margin: 60px auto;
+  background: #ffffff;
+  border-radius: 14px;
+  box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+  padding: 40px;
+}
+
+/* MENU TITLE */
+.menu-title {
+  font-size: 26px;
+  font-weight: 600;
+  color: #1e3a8a;
+  margin-bottom: 10px;
+}
+
+.subtitle {
+  color: #6b7280;
+  margin-bottom: 30px;
+}
+
+/* INPUT AREA */
+.search-box {
   display: flex;
-  height: 100vh;
-}
-
-/* ===== SIDEBAR ===== */
-.sidebar {
-  width: 280px;
-  background: var(--sidebar-bg);
-  color: white;
-  display: flex;
-  flex-direction: column;
-  padding: 20px;
-}
-
-.sidebar h2 {
-  margin: 0 0 10px;
-}
-
-.sidebar img {
-  width: 100%;
-  border-radius: 12px;
-  margin: 15px 0;
-}
-
-.history {
-  flex: 1;
-  overflow-y: auto;
-}
-
-.history-item {
-  padding: 10px;
-  border-radius: 8px;
-  cursor: pointer;
-  background: #1e293b;
-  margin-bottom: 8px;
-  font-size: 14px;
-}
-
-.history-item:hover {
-  background: #334155;
-}
-
-.toggle {
-  background: #6366f1;
-  border: none;
-  color: white;
-  padding: 10px;
-  border-radius: 8px;
-  cursor: pointer;
-}
-
-/* ===== CHAT AREA ===== */
-.chat-area {
-  flex: 1;
-  background: var(--chat-bg);
-  display: flex;
-  flex-direction: column;
-}
-
-.chat-header {
-  padding: 16px;
-  border-bottom: 1px solid #e5e7eb;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.chat {
-  flex: 1;
-  padding: 30px;
-  overflow-y: auto;
-}
-
-.message {
-  max-width: 70%;
-  margin-bottom: 20px;
-  line-height: 1.5;
-}
-
-.user {
-  margin-left: auto;
-}
-
-.user .bubble {
-  background: var(--user-bubble);
-  color: white;
-  border-radius: 18px 18px 4px 18px;
-}
-
-.bot .bubble {
-  background: var(--bot-bubble);
-  color: var(--text-dark);
-  border-radius: 18px 18px 18px 4px;
-}
-
-.bubble {
-  padding: 14px 18px;
-  font-size: 15px;
-  white-space: pre-wrap;
-}
-
-.copy {
-  font-size: 12px;
-  cursor: pointer;
-  margin-top: 6px;
-  color: #6366f1;
-}
-
-/* ===== INPUT ===== */
-.input-area {
-  padding: 20px;
-  border-top: 1px solid #e5e7eb;
-  display: flex;
-  gap: 10px;
+  gap: 12px;
+  margin-bottom: 30px;
 }
 
 input {
   flex: 1;
-  padding: 14px;
+  padding: 14px 16px;
   font-size: 16px;
-  border-radius: 12px;
+  border-radius: 10px;
   border: 1px solid #d1d5db;
 }
 
-button.send {
-  padding: 14px 20px;
-  background: #4f46e5;
-  color: white;
+button {
+  padding: 14px 22px;
+  font-size: 16px;
+  border-radius: 10px;
   border: none;
-  border-radius: 12px;
   cursor: pointer;
+  background: #2563eb;
+  color: white;
+}
+
+button:hover {
+  background: #1d4ed8;
+}
+
+/* RESULT AREA */
+.result {
+  margin-top: 20px;
+}
+
+.card {
+  background: #f9fafb;
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 16px;
+  border-left: 6px solid #2563eb;
+}
+
+.card h3 {
+  margin-top: 0;
+  color: #1e40af;
+}
+
+.label {
+  font-weight: 600;
+  margin-top: 12px;
+}
+
+.action {
+  margin-left: 15px;
+  color: #065f46;
+}
+
+.hidden {
+  display: none;
+}
+
+.error {
+  color: #b91c1c;
+  background: #fee2e2;
+  padding: 15px;
+  border-radius: 10px;
 }
 </style>
 </head>
 
 <body>
-<div class="app">
-
-  <!-- SIDEBAR -->
-  <div class="sidebar">
-    <h2>Error Insight</h2>
-    <p style="font-size:13px;color:#cbd5f5">
-      Know your error & solution
-    </p>
-
-    <img src="https://illustrations.popsy.co/gray/chatting.svg" />
-
-    <div class="history" id="history"></div>
-
-    <button class="toggle" onclick="toggleTheme()">🌙 / ☀</button>
-  </div>
-
-  <!-- CHAT AREA -->
-  <div class="chat-area">
-    <div class="chat-header">
-      <strong>Error Assistant</strong>
+  <div class="container">
+    <div class="menu-title">Error Resolution Center</div>
+    <div class="subtitle">
+      Please enter the error code to view its description, causes, and solutions.
     </div>
 
-    <div class="chat" id="chat"></div>
-
-    <div class="input-area">
-      <input id="input" placeholder="Ask an error code or issue..."
-             onkeydown="if(event.key==='Enter')send()" />
-      <button class="send" onclick="send()">Send</button>
+    <!-- INPUT -->
+    <div class="search-box">
+      <input
+        id="errorInput"
+        placeholder="Enter Error Code (e.g. ERR001)"
+        onkeydown="if(event.key==='Enter') searchError()"
+      />
+      <button onclick="searchError()">Search</button>
     </div>
-  </div>
 
-</div>
+    <!-- RESULT -->
+    <div id="result" class="result hidden"></div>
+  </div>
 
 <script>
-const chat = document.getElementById("chat");
-const input = document.getElementById("input");
-const historyDiv = document.getElementById("history");
+const resultDiv = document.getElementById("result");
 
-let history = JSON.parse(localStorage.getItem("history") || "[]");
+async function searchError() {
+  const code = document.getElementById("errorInput").value.trim();
+  if (!code) return;
 
-function toggleTheme() {
-  document.body.classList.toggle("dark");
-}
-
-function addMessage(role, text, copy=false) {
-  const msg = document.createElement("div");
-  msg.className = `message ${role}`;
-
-  const bubble = document.createElement("div");
-  bubble.className = "bubble";
-  bubble.innerHTML = text;
-
-  msg.appendChild(bubble);
-
-  if (copy) {
-    const c = document.createElement("div");
-    c.className = "copy";
-    c.innerText = "📋 Copy";
-    c.onclick = () => navigator.clipboard.writeText(bubble.innerText);
-    msg.appendChild(c);
-  }
-
-  chat.appendChild(msg);
-  chat.scrollTop = chat.scrollHeight;
-}
-
-function renderHistory() {
-  historyDiv.innerHTML = "";
-  history.forEach(h => {
-    const div = document.createElement("div");
-    div.className = "history-item";
-    div.innerText = h;
-    div.onclick = () => input.value = h;
-    historyDiv.appendChild(div);
-  });
-}
-
-async function send() {
-  const msg = input.value.trim();
-  if (!msg) return;
-
-  addMessage("user", msg);
-  input.value = "";
-
-  history = [msg, ...history.filter(x => x !== msg)].slice(0, 8);
-  localStorage.setItem("history", JSON.stringify(history));
-  renderHistory();
+  resultDiv.classList.add("hidden");
+  resultDiv.innerHTML = "";
 
   try {
     const res = await fetch("/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message: msg })
+      body: JSON.stringify({ message: code })
     });
+
     const data = await res.json();
-    addMessage("bot", data.response, true);
-  } catch {
-    addMessage("bot", "Server error");
+
+    if (data.type === "no_match") {
+      resultDiv.innerHTML = `<div class="error">No matching error found.</div>`;
+      resultDiv.classList.remove("hidden");
+      return;
+    }
+
+    resultDiv.innerHTML = `
+      <div class="card">
+        ${data.response}
+      </div>
+    `;
+    resultDiv.classList.remove("hidden");
+
+  } catch (err) {
+    resultDiv.innerHTML = `<div class="error">Server error. Please try again.</div>`;
+    resultDiv.classList.remove("hidden");
   }
 }
-
-renderHistory();
 </script>
+
 </body>
 </html>
