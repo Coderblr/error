@@ -38,6 +38,7 @@ def load_excel_data(file_path: str) -> bool:
         # Normalize column names (strip whitespace, lowercase)
         df.columns = df.columns.str.strip().str.lower()
         error_data = df
+        print(f"Loaded columns: {list(error_data.columns)}")
         return True
     except Exception as e:
         print(f"Error loading Excel file: {e}")
@@ -50,15 +51,20 @@ def search_error_code(query: str) -> Optional[dict]:
     
     query = query.strip().upper()
     
-    # Try to find exact match in error code column
+    # Try to find error code column
     code_col = None
     for col in error_data.columns:
-        if 'error' in col and 'code' in col:
+        col_lower = col.lower()
+        if 'error' in col_lower and 'code' in col_lower:
+            code_col = col
+            break
+        elif col_lower == 'errorcode' or col_lower == 'code':
             code_col = col
             break
     
     if code_col is None:
-        return None
+        # If no specific error code column, try first column
+        code_col = error_data.columns[0]
     
     # Search for the error code
     result = error_data[error_data[code_col].astype(str).str.upper() == query]
@@ -92,26 +98,92 @@ def fuzzy_search(query: str) -> list:
     return results[:5]  # Return top 5 results
 
 def format_response(error_dict: dict) -> str:
-    """Format error information into readable response"""
+    """Format error information into readable response with proper structure"""
     response = ""
+    
+    # Extract error code and description first
+    error_code = None
+    error_desc = None
+    causes_actions = []
     
     for key, value in error_dict.items():
         if pd.notna(value) and key != 'relevance_score':
-            formatted_key = key.replace('_', ' ').title()
-            response += f"**{formatted_key}:** {value}\n\n"
+            key_lower = key.lower()
+            
+            # Identify error code
+            if 'error' in key_lower and 'code' in key_lower:
+                error_code = value
+            elif key_lower == 'errorcode' or key_lower == 'code':
+                error_code = value
+            # Identify description
+            elif 'description' in key_lower or key_lower == 'desc':
+                error_desc = value
+            # Identify causes and actions
+            elif 'cause' in key_lower or 'action' in key_lower:
+                causes_actions.append((key, value))
+    
+    # Format the response
+    if error_code:
+        response += f"**Error Code:** {error_code}\n\n"
+    
+    if error_desc:
+        response += f"**Description:** {error_desc}\n\n"
+    
+    # Group causes with their actions
+    cause_action_pairs = {}
+    for key, value in causes_actions:
+        key_lower = key.lower()
+        
+        # Extract number from cause/action (cause1, action1, etc.)
+        if 'cause' in key_lower:
+            num = ''.join(filter(str.isdigit, key_lower)) or '1'
+            if num not in cause_action_pairs:
+                cause_action_pairs[num] = {}
+            cause_action_pairs[num]['cause'] = value
+        elif 'action' in key_lower:
+            num = ''.join(filter(str.isdigit, key_lower)) or '1'
+            if num not in cause_action_pairs:
+                cause_action_pairs[num] = {}
+            cause_action_pairs[num]['action'] = value
+    
+    # Display causes and actions
+    if cause_action_pairs:
+        response += "**Possible Causes & Actions:**\n\n"
+        for num in sorted(cause_action_pairs.keys()):
+            pair = cause_action_pairs[num]
+            if 'cause' in pair:
+                response += f"🔍 **Cause {num}:** {pair['cause']}\n"
+            if 'action' in pair:
+                response += f"✅ **Action {num}:** {pair['action']}\n\n"
+    
+    # Add any remaining fields that weren't categorized
+    other_fields = []
+    categorized_keys = ['error', 'code', 'errorcode', 'description', 'desc', 'cause', 'action', 'relevance_score']
+    
+    for key, value in error_dict.items():
+        if pd.notna(value) and key != 'relevance_score':
+            key_lower = key.lower()
+            if not any(cat in key_lower for cat in categorized_keys):
+                formatted_key = key.replace('_', ' ').title()
+                other_fields.append(f"**{formatted_key}:** {value}")
+    
+    if other_fields:
+        response += "\n".join(other_fields)
     
     return response.strip()
 
 def format_short_response(error_dict: dict) -> str:
-    """Format shortened error information"""
+    """Format shortened error information for search results"""
     parts = []
     
     for key, value in error_dict.items():
         if pd.notna(value) and key != 'relevance_score':
-            if 'code' in key.lower():
+            key_lower = key.lower()
+            if 'code' in key_lower and 'error' in key_lower:
                 parts.insert(0, f"Code: {value}")
-            elif 'description' in key.lower():
-                parts.append(f"{value}")
+            elif 'description' in key_lower:
+                desc = str(value)[:100] + "..." if len(str(value)) > 100 else str(value)
+                parts.append(f"{desc}")
                 break
     
     return " - ".join(parts)
@@ -157,6 +229,7 @@ async def chat(message: ChatMessage):
         response = "I found the following related errors:\n\n"
         for i, res in enumerate(fuzzy_results, 1):
             response += f"{i}. {format_short_response(res)}\n\n"
+        response += "\nPlease type the exact error code for detailed information."
         return ChatResponse(
             response=response,
             type="fuzzy_match",
