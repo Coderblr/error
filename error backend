@@ -1,296 +1,155 @@
-from fastapi import FastAPI, File, UploadFile, HTTPException
-from fastapi.responses import HTMLResponse, JSONResponse
-from fastapi.staticfiles import StaticFiles
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-import pandas as pd
-import os
-import shutil
-from typing import Optional
-
-app = FastAPI(title="Error Code Assistant API")
-
-# CORS middleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-# Global variable to store error data
-error_data = None
-
-class ChatMessage(BaseModel):
-    message: str
-
-class ChatResponse(BaseModel):
-    response: str
-    type: str
-    data: Optional[dict] = None
-
-def load_excel_data(file_path: str) -> bool:
-    """Load and process Excel data"""
-    global error_data
-    try:
-        df = pd.read_excel(file_path)
-        # Normalize column names (strip whitespace, lowercase)
-        df.columns = df.columns.str.strip().str.lower()
-        error_data = df
-        print(f"Loaded columns: {list(error_data.columns)}")
-        return True
-    except Exception as e:
-        print(f"Error loading Excel file: {e}")
-        return False
-
-def search_error_code(query: str) -> Optional[dict]:
-    """Search for error code in the database"""
-    if error_data is None:
-        return None
-    
-    query = query.strip().upper()
-    
-    # Try to find error code column
-    code_col = None
-    for col in error_data.columns:
-        col_lower = col.lower()
-        if 'error' in col_lower and 'code' in col_lower:
-            code_col = col
-            break
-        elif col_lower == 'errorcode' or col_lower == 'code':
-            code_col = col
-            break
-    
-    if code_col is None:
-        # If no specific error code column, try first column
-        code_col = error_data.columns[0]
-    
-    # Search for the error code
-    result = error_data[error_data[code_col].astype(str).str.upper() == query]
-    
-    if not result.empty:
-        return result.iloc[0].to_dict()
-    
-    return None
-
-def fuzzy_search(query: str) -> list:
-    """Perform fuzzy search across all columns"""
-    if error_data is None:
-        return []
-    
-    query = query.lower()
-    results = []
-    
-    for idx, row in error_data.iterrows():
-        score = 0
-        for col, value in row.items():
-            if pd.notna(value) and query in str(value).lower():
-                score += 1
-        
-        if score > 0:
-            result_dict = row.to_dict()
-            result_dict['relevance_score'] = score
-            results.append(result_dict)
-    
-    # Sort by relevance
-    results.sort(key=lambda x: x['relevance_score'], reverse=True)
-    return results[:5]  # Return top 5 results
-
-def format_response(error_dict: dict) -> str:
-    """Format error information into readable response with proper structure"""
-    response = ""
-    
-    # Extract error code and description first
-    error_code = None
-    error_desc = None
-    causes_actions = []
-    
-    for key, value in error_dict.items():
-        if pd.notna(value) and key != 'relevance_score':
-            key_lower = key.lower()
-            
-            # Identify error code
-            if 'error' in key_lower and 'code' in key_lower:
-                error_code = value
-            elif key_lower == 'errorcode' or key_lower == 'code':
-                error_code = value
-            # Identify description
-            elif 'description' in key_lower or key_lower == 'desc':
-                error_desc = value
-            # Identify causes and actions
-            elif 'cause' in key_lower or 'action' in key_lower:
-                causes_actions.append((key, value))
-    
-    # Format the response
-    if error_code:
-        response += f"**Error Code:** {error_code}\n\n"
-    
-    if error_desc:
-        response += f"**Description:** {error_desc}\n\n"
-    
-    # Group causes with their actions
-    cause_action_pairs = {}
-    for key, value in causes_actions:
-        key_lower = key.lower()
-        
-        # Extract number from cause/action (cause1, action1, etc.)
-        if 'cause' in key_lower:
-            num = ''.join(filter(str.isdigit, key_lower)) or '1'
-            if num not in cause_action_pairs:
-                cause_action_pairs[num] = {}
-            cause_action_pairs[num]['cause'] = value
-        elif 'action' in key_lower:
-            num = ''.join(filter(str.isdigit, key_lower)) or '1'
-            if num not in cause_action_pairs:
-                cause_action_pairs[num] = {}
-            cause_action_pairs[num]['action'] = value
-    
-    # Display causes and actions
-    if cause_action_pairs:
-        response += "**Possible Causes & Actions:**\n\n"
-        for num in sorted(cause_action_pairs.keys()):
-            pair = cause_action_pairs[num]
-            if 'cause' in pair:
-                response += f"🔍 **Cause {num}:** {pair['cause']}\n"
-            if 'action' in pair:
-                response += f"✅ **Action {num}:** {pair['action']}\n\n"
-    
-    # Add any remaining fields that weren't categorized
-    other_fields = []
-    categorized_keys = ['error', 'code', 'errorcode', 'description', 'desc', 'cause', 'action', 'relevance_score']
-    
-    for key, value in error_dict.items():
-        if pd.notna(value) and key != 'relevance_score':
-            key_lower = key.lower()
-            if not any(cat in key_lower for cat in categorized_keys):
-                formatted_key = key.replace('_', ' ').title()
-                other_fields.append(f"**{formatted_key}:** {value}")
-    
-    if other_fields:
-        response += "\n".join(other_fields)
-    
-    return response.strip()
-
-def format_short_response(error_dict: dict) -> str:
-    """Format shortened error information for search results"""
-    parts = []
-    
-    for key, value in error_dict.items():
-        if pd.notna(value) and key != 'relevance_score':
-            key_lower = key.lower()
-            if 'code' in key_lower and 'error' in key_lower:
-                parts.insert(0, f"Code: {value}")
-            elif 'description' in key_lower:
-                desc = str(value)[:100] + "..." if len(str(value)) > 100 else str(value)
-                parts.append(f"{desc}")
-                break
-    
-    return " - ".join(parts)
-
-@app.get("/", response_class=HTMLResponse)
-async def read_root():
-    """Serve the main HTML page"""
-    try:
-        with open("templates/index.html", "r", encoding="utf-8") as f:
-            return HTMLResponse(content=f.read())
-    except FileNotFoundError:
-        return HTMLResponse(content="<h1>Template not found. Please create templates/index.html</h1>")
-
-@app.post("/api/chat", response_model=ChatResponse)
-async def chat(message: ChatMessage):
-    """Handle chat messages"""
-    user_message = message.message.strip()
-    
-    if not user_message:
-        raise HTTPException(status_code=400, detail="No message provided")
-    
-    if error_data is None:
-        return ChatResponse(
-            response="Error database not loaded. Please upload an Excel file first.",
-            type="error"
-        )
-    
-    # Try exact error code search first
-    result = search_error_code(user_message)
-    
-    if result:
-        response = format_response(result)
-        return ChatResponse(
-            response=response,
-            type="exact_match",
-            data=result
-        )
-    
-    # If no exact match, try fuzzy search
-    fuzzy_results = fuzzy_search(user_message)
-    
-    if fuzzy_results:
-        response = "I found the following related errors:\n\n"
-        for i, res in enumerate(fuzzy_results, 1):
-            response += f"{i}. {format_short_response(res)}\n\n"
-        response += "\nPlease type the exact error code for detailed information."
-        return ChatResponse(
-            response=response,
-            type="fuzzy_match",
-            data={"results": fuzzy_results}
-        )
-    
-    return ChatResponse(
-        response="No matching error found. Please check the error code and try again.",
-        type="no_match"
-    )
-
-@app.post("/api/upload")
-async def upload_file(file: UploadFile = File(...)):
-    """Upload and load Excel file"""
-    
-    if not file.filename:
-        raise HTTPException(status_code=400, detail="No file selected")
-    
-    if not file.filename.endswith(('.xlsx', '.xls')):
-        raise HTTPException(
-            status_code=400,
-            detail="Invalid file format. Please upload .xlsx or .xls file"
-        )
-    
-    # Create uploads directory if it doesn't exist
-    os.makedirs("uploads", exist_ok=True)
-    
-    # Save uploaded file
-    file_path = os.path.join("uploads", file.filename)
-    
-    try:
-        with open(file_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to save file: {str(e)}")
-    
-    # Load the Excel file
-    if load_excel_data(file_path):
-        return JSONResponse(content={
-            "message": "File uploaded successfully",
-            "columns": list(error_data.columns),
-            "rows": len(error_data)
-        })
-    else:
-        raise HTTPException(status_code=500, detail="Failed to load Excel file")
-
-@app.get("/api/health")
-async def health_check():
-    """Health check endpoint"""
-    return {
-        "status": "healthy",
-        "data_loaded": error_data is not None,
-        "rows": len(error_data) if error_data is not None else 0
-    }
-
-if __name__ == "__main__":
-    import uvicorn
-    
-    # Try to load default Excel file if exists
+@app.on_event("startup")
+def load_default_excel():
     if os.path.exists("error_codes.xlsx"):
         load_excel_data("error_codes.xlsx")
-        print("Loaded default error_codes.xlsx")
-    
-    uvicorn.run(app, host="0.0.0.0", port=8000, reload=True)
+        print("Excel file loaded at startup")
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Error Code Assistant</title>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f5f7fa;
+      display: flex;
+      justify-content: center;
+      padding: 30px;
+    }
+
+    .chat-container {
+      width: 700px;
+      background: #fff;
+      border-radius: 8px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .header {
+      background: #2c3e50;
+      color: white;
+      padding: 15px;
+      font-size: 18px;
+      text-align: center;
+    }
+
+    .messages {
+      padding: 15px;
+      height: 400px;
+      overflow-y: auto;
+      border-bottom: 1px solid #ddd;
+    }
+
+    .message {
+      margin-bottom: 15px;
+    }
+
+    .user {
+      font-weight: bold;
+      color: #2980b9;
+    }
+
+    .bot {
+      font-weight: bold;
+      color: #27ae60;
+    }
+
+    .content {
+      margin-top: 5px;
+      white-space: pre-wrap;
+    }
+
+    .input-area {
+      display: flex;
+      padding: 15px;
+      gap: 10px;
+    }
+
+    input {
+      flex: 1;
+      padding: 10px;
+      font-size: 16px;
+    }
+
+    button {
+      padding: 10px 20px;
+      font-size: 16px;
+      cursor: pointer;
+      background: #2c3e50;
+      color: white;
+      border: none;
+      border-radius: 4px;
+    }
+
+    button:hover {
+      background: #1a252f;
+    }
+  </style>
+</head>
+<body>
+
+<div class="chat-container">
+  <div class="header">Error Code Assistant</div>
+
+  <div id="messages" class="messages"></div>
+
+  <div class="input-area">
+    <input
+      type="text"
+      id="userInput"
+      placeholder="Enter error code or issue..."
+      onkeydown="if(event.key === 'Enter') sendMessage()"
+    />
+    <button onclick="sendMessage()">Send</button>
+  </div>
+</div>
+
+<script>
+  const messagesDiv = document.getElementById("messages");
+  const input = document.getElementById("userInput");
+
+  function addMessage(role, text) {
+    const msgDiv = document.createElement("div");
+    msgDiv.className = "message";
+
+    const roleSpan = document.createElement("span");
+    roleSpan.className = role;
+    roleSpan.textContent = role === "user" ? "You" : "Bot";
+
+    const contentDiv = document.createElement("div");
+    contentDiv.className = "content";
+    contentDiv.innerHTML = text;
+
+    msgDiv.appendChild(roleSpan);
+    msgDiv.appendChild(contentDiv);
+
+    messagesDiv.appendChild(msgDiv);
+    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+  }
+
+  async function sendMessage() {
+    const message = input.value.trim();
+    if (!message) return;
+
+    addMessage("user", message);
+    input.value = "";
+
+    try {
+      const response = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message })
+      });
+
+      const data = await response.json();
+      addMessage("bot", data.response);
+    } catch (error) {
+      addMessage("bot", "❌ Server error. Please try again.");
+    }
+  }
+</script>
+
+</body>
+</html>
