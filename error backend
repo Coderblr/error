@@ -1,0 +1,223 @@
+from fastapi import FastAPI, File, UploadFile, HTTPException
+from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+import pandas as pd
+import os
+import shutil
+from typing import Optional
+
+app = FastAPI(title="Error Code Assistant API")
+
+# CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Global variable to store error data
+error_data = None
+
+class ChatMessage(BaseModel):
+    message: str
+
+class ChatResponse(BaseModel):
+    response: str
+    type: str
+    data: Optional[dict] = None
+
+def load_excel_data(file_path: str) -> bool:
+    """Load and process Excel data"""
+    global error_data
+    try:
+        df = pd.read_excel(file_path)
+        # Normalize column names (strip whitespace, lowercase)
+        df.columns = df.columns.str.strip().str.lower()
+        error_data = df
+        return True
+    except Exception as e:
+        print(f"Error loading Excel file: {e}")
+        return False
+
+def search_error_code(query: str) -> Optional[dict]:
+    """Search for error code in the database"""
+    if error_data is None:
+        return None
+    
+    query = query.strip().upper()
+    
+    # Try to find exact match in error code column
+    code_col = None
+    for col in error_data.columns:
+        if 'error' in col and 'code' in col:
+            code_col = col
+            break
+    
+    if code_col is None:
+        return None
+    
+    # Search for the error code
+    result = error_data[error_data[code_col].astype(str).str.upper() == query]
+    
+    if not result.empty:
+        return result.iloc[0].to_dict()
+    
+    return None
+
+def fuzzy_search(query: str) -> list:
+    """Perform fuzzy search across all columns"""
+    if error_data is None:
+        return []
+    
+    query = query.lower()
+    results = []
+    
+    for idx, row in error_data.iterrows():
+        score = 0
+        for col, value in row.items():
+            if pd.notna(value) and query in str(value).lower():
+                score += 1
+        
+        if score > 0:
+            result_dict = row.to_dict()
+            result_dict['relevance_score'] = score
+            results.append(result_dict)
+    
+    # Sort by relevance
+    results.sort(key=lambda x: x['relevance_score'], reverse=True)
+    return results[:5]  # Return top 5 results
+
+def format_response(error_dict: dict) -> str:
+    """Format error information into readable response"""
+    response = ""
+    
+    for key, value in error_dict.items():
+        if pd.notna(value) and key != 'relevance_score':
+            formatted_key = key.replace('_', ' ').title()
+            response += f"**{formatted_key}:** {value}\n\n"
+    
+    return response.strip()
+
+def format_short_response(error_dict: dict) -> str:
+    """Format shortened error information"""
+    parts = []
+    
+    for key, value in error_dict.items():
+        if pd.notna(value) and key != 'relevance_score':
+            if 'code' in key.lower():
+                parts.insert(0, f"Code: {value}")
+            elif 'description' in key.lower():
+                parts.append(f"{value}")
+                break
+    
+    return " - ".join(parts)
+
+@app.get("/", response_class=HTMLResponse)
+async def read_root():
+    """Serve the main HTML page"""
+    try:
+        with open("templates/index.html", "r", encoding="utf-8") as f:
+            return HTMLResponse(content=f.read())
+    except FileNotFoundError:
+        return HTMLResponse(content="<h1>Template not found. Please create templates/index.html</h1>")
+
+@app.post("/api/chat", response_model=ChatResponse)
+async def chat(message: ChatMessage):
+    """Handle chat messages"""
+    user_message = message.message.strip()
+    
+    if not user_message:
+        raise HTTPException(status_code=400, detail="No message provided")
+    
+    if error_data is None:
+        return ChatResponse(
+            response="Error database not loaded. Please upload an Excel file first.",
+            type="error"
+        )
+    
+    # Try exact error code search first
+    result = search_error_code(user_message)
+    
+    if result:
+        response = format_response(result)
+        return ChatResponse(
+            response=response,
+            type="exact_match",
+            data=result
+        )
+    
+    # If no exact match, try fuzzy search
+    fuzzy_results = fuzzy_search(user_message)
+    
+    if fuzzy_results:
+        response = "I found the following related errors:\n\n"
+        for i, res in enumerate(fuzzy_results, 1):
+            response += f"{i}. {format_short_response(res)}\n\n"
+        return ChatResponse(
+            response=response,
+            type="fuzzy_match",
+            data={"results": fuzzy_results}
+        )
+    
+    return ChatResponse(
+        response="No matching error found. Please check the error code and try again.",
+        type="no_match"
+    )
+
+@app.post("/api/upload")
+async def upload_file(file: UploadFile = File(...)):
+    """Upload and load Excel file"""
+    
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="No file selected")
+    
+    if not file.filename.endswith(('.xlsx', '.xls')):
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid file format. Please upload .xlsx or .xls file"
+        )
+    
+    # Create uploads directory if it doesn't exist
+    os.makedirs("uploads", exist_ok=True)
+    
+    # Save uploaded file
+    file_path = os.path.join("uploads", file.filename)
+    
+    try:
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to save file: {str(e)}")
+    
+    # Load the Excel file
+    if load_excel_data(file_path):
+        return JSONResponse(content={
+            "message": "File uploaded successfully",
+            "columns": list(error_data.columns),
+            "rows": len(error_data)
+        })
+    else:
+        raise HTTPException(status_code=500, detail="Failed to load Excel file")
+
+@app.get("/api/health")
+async def health_check():
+    """Health check endpoint"""
+    return {
+        "status": "healthy",
+        "data_loaded": error_data is not None,
+        "rows": len(error_data) if error_data is not None else 0
+    }
+
+if __name__ == "__main__":
+    import uvicorn
+    
+    # Try to load default Excel file if exists
+    if os.path.exists("error_codes.xlsx"):
+        load_excel_data("error_codes.xlsx")
+        print("Loaded default error_codes.xlsx")
+    
+    uvicorn.run(app, host="0.0.0.0", port=8000, reload=True)
