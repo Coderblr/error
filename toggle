@@ -1,0 +1,294 @@
+import { useState } from "react";
+import { styles } from "../../styles/AppStyles";
+
+export default function LoanAccountView() {
+  const [cif, setCif] = useState("");
+  const [region, setRegion] = useState("");
+  const [loan_type, setLoan_Type] = useState("");
+  const [response, setResponse] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [showOutput, setShowOutput] = useState(true);
+
+  // Toggle states
+  const [isToggled, setIsToggled] = useState(false);
+  const [toggleLoading, setToggleLoading] = useState(false);
+  const [toggleResponse, setToggleResponse] = useState("");
+  const [toggleError, setToggleError] = useState("");
+
+  /* ---------------- TOGGLE STYLES (COMPACT ICON BASED) ---------------- */
+
+  const toggleButtonStyle = {
+    position: "relative",
+    width: "32px",
+    height: "16px",
+    backgroundColor: isToggled ? "#28a745" : "#dc3545",
+    borderRadius: "16px",
+    cursor: "pointer",
+    border: "none",
+    padding: 0,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: isToggled ? "flex-end" : "flex-start",
+  };
+
+  const toggleSliderStyle = {
+    width: "14px",
+    height: "14px",
+    backgroundColor: "#fff",
+    borderRadius: "50%",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontSize: "10px",
+    fontWeight: "bold",
+    color: isToggled ? "#28a745" : "#dc3545",
+    margin: "1px",
+  };
+
+  /* ---------------- HANDLE TOGGLE ---------------- */
+
+  const handleToggle = async () => {
+    if (!region) {
+      setToggleError("Please select a region first");
+      return;
+    }
+
+    setToggleLoading(true);
+    setToggleError("");
+    setToggleResponse("");
+
+    const userToken = localStorage.getItem("userToken");
+    const url = "http://10.1.161.165:5050/toggle/";
+
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${userToken}`,
+        },
+        body: JSON.stringify({
+          region: region,
+          action: isToggled ? "DEACTIVATE" : "ACTIVATE",
+        }),
+      });
+
+      const data = await res.json();
+
+      if (data.status === "SUCCESS") {
+        setIsToggled(!isToggled);
+        setToggleResponse(
+          isToggled ? "Service Deactivated" : "Service Activated"
+        );
+      } else {
+        setToggleError("Toggle action failed");
+      }
+    } catch (err) {
+      setToggleError(err.message);
+    } finally {
+      setToggleLoading(false);
+    }
+  };
+
+  /* ---------------- HANDLE SUBMIT ---------------- */
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+
+    if (!isToggled) {
+      setError("Please activate the toggle first");
+      return;
+    }
+
+    setLoading(true);
+    setError("");
+    setResponse("");
+
+    const userToken = localStorage.getItem("userToken");
+    const url = "http://10.1.161.165:5050/loan_account_creation/";
+
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${userToken}`,
+        },
+        body: JSON.stringify({
+          region,
+          loan_type,
+          cif,
+        }),
+      });
+
+      const data = await res.json();
+      setResponse(data);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  /* ---------------- RESET ---------------- */
+
+  const handleManualReset = () => {
+    setCif("");
+    setRegion("");
+    setLoan_Type("");
+    setResponse("");
+    setError("");
+    setIsToggled(false);
+    setToggleResponse("");
+    setToggleError("");
+  };
+
+  /* ---------------- UI ---------------- */
+
+  return (
+    <div>
+      <div style={styles.pageHeader}>
+        <h1 style={styles.pageTitle}>Create Loan Account</h1>
+        <p style={styles.pageSubtitle}>Generate loan accounts for testing</p>
+      </div>
+
+      <div style={styles.formCard}>
+        <form onSubmit={handleSubmit}>
+          {/* REGION + TOGGLE INLINE */}
+          <div
+            style={{
+              ...styles.formGroup,
+              display: "flex",
+              alignItems: "center",
+              gap: "12px",
+            }}
+          >
+            <div style={{ flex: 1 }}>
+              <label style={styles.label}>Region</label>
+              <select
+                value={region}
+                onChange={(e) => {
+                  setRegion(e.target.value);
+                  setIsToggled(false);
+                  setToggleResponse("");
+                  setToggleError("");
+                }}
+                style={styles.select}
+                required
+              >
+                <option value="">Select Region</option>
+                <option value="k">K - Pre-Prod</option>
+                <option value="j">J - Pre-Prod</option>
+                <option value="r1">R1 - Pre-Prod</option>
+              </select>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleToggle}
+              style={toggleButtonStyle}
+              disabled={!region || toggleLoading}
+              title={isToggled ? "Deactivate Service" : "Activate Service"}
+            >
+              <div style={toggleSliderStyle}>
+                {isToggled ? "✔" : "✖"}
+              </div>
+            </button>
+          </div>
+
+          {toggleResponse && (
+            <div style={{ color: "#155724", marginBottom: "12px" }}>
+              {toggleResponse}
+            </div>
+          )}
+
+          {toggleError && (
+            <div style={{ color: "#721c24", marginBottom: "12px" }}>
+              {toggleError}
+            </div>
+          )}
+
+          {/* FORM (ENABLED ONLY WHEN TOGGLED) */}
+          <div
+            style={{
+              opacity: isToggled ? 1 : 0.5,
+              pointerEvents: isToggled ? "auto" : "none",
+              transition: "opacity 0.3s",
+            }}
+          >
+            <div style={styles.formGrid}>
+              <div style={styles.formGroup}>
+                <label style={styles.label}>CIF</label>
+                <input
+                  type="text"
+                  value={cif}
+                  onChange={(e) => setCif(e.target.value)}
+                  style={styles.input}
+                  required
+                />
+              </div>
+
+              <div style={styles.formGroup}>
+                <label style={styles.label}>Loan Type</label>
+                <select
+                  value={loan_type}
+                  onChange={(e) => setLoan_Type(e.target.value)}
+                  style={styles.select}
+                  required
+                >
+                  <option value="">Select Loan Type</option>
+                  <option value="home">Home Loan</option>
+                  <option value="education">Education Loan</option>
+                  <option value="vehicle">Vehicle Loan</option>
+                  <option value="agri">Agriculture Loan</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div style={{ display: "flex", gap: "10px", marginTop: "20px" }}>
+            <button
+              type="submit"
+              style={styles.primaryButton}
+              disabled={loading || !isToggled}
+            >
+              {loading ? "Creating..." : "Create Loan Account"}
+            </button>
+
+            <button
+              type="button"
+              onClick={handleManualReset}
+              style={styles.secondaryButton}
+            >
+              Reset All
+            </button>
+          </div>
+        </form>
+      </div>
+
+      {error && (
+        <div style={{ ...styles.resultsCard, backgroundColor: "#f8d7da" }}>
+          <strong>Error:</strong> {error}
+        </div>
+      )}
+
+      {showOutput && response?.status === "SUCCESS" && (
+        <div style={{ ...styles.resultsCard, backgroundColor: "#d4edda" }}>
+          <h3>Loan Account Created Successfully</h3>
+          <p><strong>Status:</strong> {response.status}</p>
+          <p><strong>Region:</strong> {response.region}</p>
+          <p><strong>Loan Type:</strong> {response.loan_type}</p>
+          <p><strong>CIF:</strong> {response.cif}</p>
+        </div>
+      )}
+
+      {showOutput && response?.status === "FAILED" && (
+        <div style={{ ...styles.resultsCard, backgroundColor: "#f8d7da" }}>
+          <h3>Loan Account Creation Failed</h3>
+          <p><strong>Error:</strong> {response.error_message}</p>
+        </div>
+      )}
+    </div>
+  );
+}
