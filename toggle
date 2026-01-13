@@ -5,10 +5,10 @@ export default function LoanAccountView() {
   const [cif, setCif] = useState("");
   const [region, setRegion] = useState("");
   const [loan_type, setLoan_Type] = useState("");
-  const [response, setResponse] = useState("");
+  const [response, setResponse] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [showOutput, setShowOutput] = useState(true);
+  const [showOutput] = useState(true);
 
   // Toggle states
   const [isToggled, setIsToggled] = useState(false);
@@ -16,16 +16,15 @@ export default function LoanAccountView() {
   const [toggleResponse, setToggleResponse] = useState("");
   const [toggleError, setToggleError] = useState("");
 
-  /* ---------------- TOGGLE STYLES (COMPACT ICON BASED) ---------------- */
+  /* ================= TOGGLE STYLES ================= */
 
   const toggleButtonStyle = {
-    position: "relative",
     width: "32px",
     height: "16px",
     backgroundColor: isToggled ? "#28a745" : "#dc3545",
     borderRadius: "16px",
-    cursor: "pointer",
     border: "none",
+    cursor: "pointer",
     padding: 0,
     display: "flex",
     alignItems: "center",
@@ -37,20 +36,19 @@ export default function LoanAccountView() {
     height: "14px",
     backgroundColor: "#fff",
     borderRadius: "50%",
+    margin: "1px",
+    fontSize: "10px",
+    fontWeight: "bold",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    fontSize: "10px",
-    fontWeight: "bold",
-    color: isToggled ? "#28a745" : "#dc3545",
-    margin: "1px",
   };
 
-  /* ---------------- HANDLE TOGGLE ---------------- */
+  /* ================= HANDLE TOGGLE ================= */
 
   const handleToggle = async () => {
     if (!region) {
-      setToggleError("Please select a region first");
+      setToggleError("Please select region first");
       return;
     }
 
@@ -59,17 +57,16 @@ export default function LoanAccountView() {
     setToggleResponse("");
 
     const userToken = localStorage.getItem("userToken");
-    const url = "http://10.1.161.165:5050/toggle/";
 
     try {
-      const res = await fetch(url, {
+      const res = await fetch("http://10.1.161.165:5050/toggle/", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${userToken}`,
         },
         body: JSON.stringify({
-          region: region,
+          region,
           action: isToggled ? "DEACTIVATE" : "ACTIVATE",
         }),
       });
@@ -82,7 +79,7 @@ export default function LoanAccountView() {
           isToggled ? "Service Deactivated" : "Service Activated"
         );
       } else {
-        setToggleError("Toggle action failed");
+        setToggleError("Toggle failed");
       }
     } catch (err) {
       setToggleError(err.message);
@@ -91,36 +88,34 @@ export default function LoanAccountView() {
     }
   };
 
-  /* ---------------- HANDLE SUBMIT ---------------- */
+  /* ================= HANDLE SUBMIT ================= */
 
-  const handleSubmit = async (event) => {
-    event.preventDefault();
+  const handleSubmit = async (e) => {
+    e.preventDefault();
 
     if (!isToggled) {
-      setError("Please activate the toggle first");
+      setError("Please activate toggle first");
       return;
     }
 
     setLoading(true);
     setError("");
-    setResponse("");
+    setResponse(null);
 
     const userToken = localStorage.getItem("userToken");
-    const url = "http://10.1.161.165:5050/loan_account_creation/";
 
     try {
-      const res = await fetch(url, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${userToken}`,
-        },
-        body: JSON.stringify({
-          region,
-          loan_type,
-          cif,
-        }),
-      });
+      const res = await fetch(
+        "http://10.1.161.165:5050/loan_account_creation/",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${userToken}`,
+          },
+          body: JSON.stringify({ region, loan_type, cif }),
+        }
+      );
 
       const data = await res.json();
       setResponse(data);
@@ -131,40 +126,40 @@ export default function LoanAccountView() {
     }
   };
 
-  /* ---------------- RESET ---------------- */
+  /* ================= RESET ================= */
 
   const handleManualReset = () => {
     setCif("");
     setRegion("");
     setLoan_Type("");
-    setResponse("");
+    setResponse(null);
     setError("");
     setIsToggled(false);
     setToggleResponse("");
     setToggleError("");
   };
 
-  /* ---------------- UI ---------------- */
+  /* ================= UI ================= */
 
   return (
     <div>
+      {/* HEADER */}
       <div style={styles.pageHeader}>
         <h1 style={styles.pageTitle}>Create Loan Account</h1>
-        <p style={styles.pageSubtitle}>Generate loan accounts for testing</p>
       </div>
 
       <div style={styles.formCard}>
         <form onSubmit={handleSubmit}>
-          {/* REGION + TOGGLE INLINE */}
+          {/* REGION + TOGGLE */}
           <div
             style={{
-              ...styles.formGroup,
-              display: "flex",
-              alignItems: "center",
-              gap: "12px",
+              display: "grid",
+              gridTemplateColumns: "1fr auto",
+              gap: "16px",
+              marginBottom: "20px",
             }}
           >
-            <div style={{ flex: 1 }}>
+            <div style={styles.formGroup}>
               <label style={styles.label}>Region</label>
               <select
                 value={region}
@@ -184,70 +179,80 @@ export default function LoanAccountView() {
               </select>
             </div>
 
-            <button
-              type="button"
-              onClick={handleToggle}
-              style={toggleButtonStyle}
-              disabled={!region || toggleLoading}
-              title={isToggled ? "Deactivate Service" : "Activate Service"}
-            >
-              <div style={toggleSliderStyle}>
-                {isToggled ? "✔" : "✖"}
-              </div>
-            </button>
+            <div style={{ display: "flex", alignItems: "flex-end" }}>
+              <button
+                type="button"
+                onClick={handleToggle}
+                style={toggleButtonStyle}
+                disabled={!region || toggleLoading}
+                title={isToggled ? "Deactivate" : "Activate"}
+              >
+                <div style={toggleSliderStyle}>
+                  {isToggled ? "✔" : "✖"}
+                </div>
+              </button>
+            </div>
           </div>
 
+          {/* TOGGLE MESSAGE */}
           {toggleResponse && (
-            <div style={{ color: "#155724", marginBottom: "12px" }}>
+            <div style={{ color: "#155724", marginBottom: "16px" }}>
               {toggleResponse}
             </div>
           )}
-
           {toggleError && (
-            <div style={{ color: "#721c24", marginBottom: "12px" }}>
+            <div style={{ color: "#721c24", marginBottom: "16px" }}>
               {toggleError}
             </div>
           )}
 
-          {/* FORM (ENABLED ONLY WHEN TOGGLED) */}
+          {/* CIF + LOAN TYPE */}
           <div
             style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: "16px",
+              marginBottom: "20px",
               opacity: isToggled ? 1 : 0.5,
               pointerEvents: isToggled ? "auto" : "none",
-              transition: "opacity 0.3s",
             }}
           >
-            <div style={styles.formGrid}>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>CIF</label>
-                <input
-                  type="text"
-                  value={cif}
-                  onChange={(e) => setCif(e.target.value)}
-                  style={styles.input}
-                  required
-                />
-              </div>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>CIF</label>
+              <input
+                type="text"
+                value={cif}
+                onChange={(e) => setCif(e.target.value)}
+                style={styles.input}
+                required
+              />
+            </div>
 
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Loan Type</label>
-                <select
-                  value={loan_type}
-                  onChange={(e) => setLoan_Type(e.target.value)}
-                  style={styles.select}
-                  required
-                >
-                  <option value="">Select Loan Type</option>
-                  <option value="home">Home Loan</option>
-                  <option value="education">Education Loan</option>
-                  <option value="vehicle">Vehicle Loan</option>
-                  <option value="agri">Agriculture Loan</option>
-                </select>
-              </div>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>Loan Type</label>
+              <select
+                value={loan_type}
+                onChange={(e) => setLoan_Type(e.target.value)}
+                style={styles.select}
+                required
+              >
+                <option value="">Select Loan Type</option>
+                <option value="home">Home Loan</option>
+                <option value="education">Education Loan</option>
+                <option value="vehicle">Vehicle Loan</option>
+                <option value="agri">Agriculture Loan</option>
+              </select>
             </div>
           </div>
 
-          <div style={{ display: "flex", gap: "10px", marginTop: "20px" }}>
+          {/* BUTTONS */}
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: "16px",
+            }}
+          >
             <button
               type="submit"
               style={styles.primaryButton}
@@ -267,6 +272,7 @@ export default function LoanAccountView() {
         </form>
       </div>
 
+      {/* OUTPUT */}
       {error && (
         <div style={{ ...styles.resultsCard, backgroundColor: "#f8d7da" }}>
           <strong>Error:</strong> {error}
@@ -276,7 +282,6 @@ export default function LoanAccountView() {
       {showOutput && response?.status === "SUCCESS" && (
         <div style={{ ...styles.resultsCard, backgroundColor: "#d4edda" }}>
           <h3>Loan Account Created Successfully</h3>
-          <p><strong>Status:</strong> {response.status}</p>
           <p><strong>Region:</strong> {response.region}</p>
           <p><strong>Loan Type:</strong> {response.loan_type}</p>
           <p><strong>CIF:</strong> {response.cif}</p>
@@ -286,7 +291,7 @@ export default function LoanAccountView() {
       {showOutput && response?.status === "FAILED" && (
         <div style={{ ...styles.resultsCard, backgroundColor: "#f8d7da" }}>
           <h3>Loan Account Creation Failed</h3>
-          <p><strong>Error:</strong> {response.error_message}</p>
+          <p>{response.error_message}</p>
         </div>
       )}
     </div>
