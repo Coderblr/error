@@ -5,7 +5,7 @@ export default function LoanAccountView() {
   const [cif, setCif] = useState("");
   const [region, setRegion] = useState("");
   const [loan_type, setLoan_Type] = useState("");
-  const [response, setResponse] = useState(null);
+  const [response, setResponse] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [showOutput] = useState(true);
@@ -16,35 +16,7 @@ export default function LoanAccountView() {
   const [toggleResponse, setToggleResponse] = useState("");
   const [toggleError, setToggleError] = useState("");
 
-  /* ================= TOGGLE STYLES ================= */
-
-  const toggleButtonStyle = {
-    width: "32px",
-    height: "16px",
-    backgroundColor: isToggled ? "#28a745" : "#dc3545",
-    borderRadius: "16px",
-    border: "none",
-    cursor: "pointer",
-    padding: 0,
-    display: "flex",
-    alignItems: "center",
-    justifyContent: isToggled ? "flex-end" : "flex-start",
-  };
-
-  const toggleSliderStyle = {
-    width: "14px",
-    height: "14px",
-    backgroundColor: "#fff",
-    borderRadius: "50%",
-    margin: "1px",
-    fontSize: "10px",
-    fontWeight: "bold",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-  };
-
-  /* ================= HANDLE TOGGLE ================= */
+  /* ================= TOGGLE HANDLER ================= */
 
   const handleToggle = async () => {
     if (!region) {
@@ -79,7 +51,7 @@ export default function LoanAccountView() {
           isToggled ? "Service Deactivated" : "Service Activated"
         );
       } else {
-        setToggleError("Toggle failed");
+        setToggleError("Toggle action failed");
       }
     } catch (err) {
       setToggleError(err.message);
@@ -88,19 +60,19 @@ export default function LoanAccountView() {
     }
   };
 
-  /* ================= HANDLE SUBMIT ================= */
+  /* ================= SUBMIT ================= */
 
   const handleSubmit = async (e) => {
     e.preventDefault();
 
     if (!isToggled) {
-      setError("Please activate toggle first");
+      setError("Please activate service first");
       return;
     }
 
     setLoading(true);
     setError("");
-    setResponse(null);
+    setResponse("");
 
     const userToken = localStorage.getItem("userToken");
 
@@ -113,7 +85,11 @@ export default function LoanAccountView() {
             "Content-Type": "application/json",
             Authorization: `Bearer ${userToken}`,
           },
-          body: JSON.stringify({ region, loan_type, cif }),
+          body: JSON.stringify({
+            region,
+            loan_type,
+            cif,
+          }),
         }
       );
 
@@ -132,7 +108,7 @@ export default function LoanAccountView() {
     setCif("");
     setRegion("");
     setLoan_Type("");
-    setResponse(null);
+    setResponse("");
     setError("");
     setIsToggled(false);
     setToggleResponse("");
@@ -143,18 +119,17 @@ export default function LoanAccountView() {
 
   return (
     <div>
-      {/* HEADER */}
       <div style={styles.pageHeader}>
         <h1 style={styles.pageTitle}>Create Loan Account</h1>
       </div>
 
       <div style={styles.formCard}>
         <form onSubmit={handleSubmit}>
-          {/* REGION + TOGGLE */}
+          {/* REGION + ACTIVATE BUTTON (50% / 50%) */}
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "1fr auto",
+              gridTemplateColumns: "1fr 1fr",
               gap: "16px",
               marginBottom: "20px",
             }}
@@ -179,29 +154,35 @@ export default function LoanAccountView() {
               </select>
             </div>
 
-            <div style={{ display: "flex", alignItems: "flex-end" }}>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>Service</label>
               <button
                 type="button"
                 onClick={handleToggle}
-                style={toggleButtonStyle}
                 disabled={!region || toggleLoading}
-                title={isToggled ? "Deactivate" : "Activate"}
+                style={{
+                  ...styles.primaryButton,
+                  backgroundColor: isToggled ? "#dc3545" : "#28a745",
+                  cursor: !region ? "not-allowed" : "pointer",
+                }}
               >
-                <div style={toggleSliderStyle}>
-                  {isToggled ? "✔" : "✖"}
-                </div>
+                {toggleLoading
+                  ? "Processing..."
+                  : isToggled
+                  ? "Deactivate"
+                  : "Activate"}
               </button>
             </div>
           </div>
 
-          {/* TOGGLE MESSAGE */}
           {toggleResponse && (
-            <div style={{ color: "#155724", marginBottom: "16px" }}>
+            <div style={{ color: "#155724", marginBottom: "12px" }}>
               {toggleResponse}
             </div>
           )}
+
           {toggleError && (
-            <div style={{ color: "#721c24", marginBottom: "16px" }}>
+            <div style={{ color: "#721c24", marginBottom: "12px" }}>
               {toggleError}
             </div>
           )}
@@ -212,9 +193,9 @@ export default function LoanAccountView() {
               display: "grid",
               gridTemplateColumns: "1fr 1fr",
               gap: "16px",
-              marginBottom: "20px",
               opacity: isToggled ? 1 : 0.5,
               pointerEvents: isToggled ? "auto" : "none",
+              marginBottom: "20px",
             }}
           >
             <div style={styles.formGroup}>
