@@ -1,0 +1,52 @@
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+import socket
+
+app = FastAPI()
+
+SERVER_HOST = "10.189.15.241"
+SERVER_PORT = 3348
+
+BASE_MESSAGE = (
+    " 0158                    **  0000      003004370011015421060039000000000     "
+    "0         00000000        000000000000000000000000000000000000"
+    "85002582472Y9876541236  "
+)
+
+OLD_CIF = "85002582472"
+OLD_MOBILE = "9876541236"
+
+
+class RequestData(BaseModel):
+    cif: str
+    mobile: str
+
+
+@app.post("/send-socket")
+def send_socket_data(data: RequestData):
+    try:
+        # Prepare message
+        message = (
+            BASE_MESSAGE.replace(OLD_CIF, data.cif)
+            .replace(OLD_MOBILE, data.mobile)
+        )
+
+        # Socket communication
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client_socket:
+            client_socket.connect((SERVER_HOST, SERVER_PORT))
+            client_socket.sendall(message.encode("utf-8"))
+            response = client_socket.recv(1024).decode("utf-8")
+
+        # Extract part of response
+        extracted = None
+        if len(response) >= 170:
+            extracted = response[139:139 + 5]
+
+        return {
+            "final_message": message,
+            "server_response": response,
+            "extracted": extracted
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
