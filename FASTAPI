@@ -1,0 +1,62 @@
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+import socket
+
+app = FastAPI()
+
+BASE_MESSAGE = (
+   
+)
+
+OLD_CIF = "85002582472"
+OLD_MOBILE = "9876541236"
+
+SERVER_CONFIG = {
+    "X":  {"host": "10.189.15.77", "port": 8668},
+    "Y":  {"host": "10.189.15.78", "port": 8668},
+    "Y2": {"host": "10.189.15.79", "port": 8668},
+    "O":  {"host": "10.189.15.80", "port": 8668},
+    "Z":  {"host": "10.189.15.81", "port": 8668},
+}
+
+
+class RequestData(BaseModel):
+    cif: str
+    mobile: str
+    server: str   # X, Y, Y2, O, Z
+
+
+@app.post("/send-socket")
+def send_socket_data(data: RequestData):
+    server_key = data.server.upper()
+
+    if server_key not in SERVER_CONFIG:
+        raise HTTPException(status_code=400, detail="Invalid server type")
+
+    server = SERVER_CONFIG[server_key]
+
+    try:
+        message = (
+            BASE_MESSAGE.replace(OLD_CIF, data.cif)
+            .replace(OLD_MOBILE, data.mobile)
+        )
+
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client_socket:
+            client_socket.settimeout(10)  # recommended
+            client_socket.connect((server["host"], server["port"]))
+            client_socket.sendall(message.encode("utf-8"))
+            response = client_socket.recv(1024).decode("utf-8")
+
+        extracted = response[139:144] if len(response) >= 170 else None
+
+        return {
+            "server": server_key,
+            "final_message": message,
+            "server_response": response,
+            "extracted": extracted
+        }
+
+    except socket.timeout:
+        raise HTTPException(status_code=504, detail="Socket timeout")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
