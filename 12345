@@ -1,0 +1,185 @@
+import { useState } from "react";
+import { styles } from "../../styles/AppStyles";
+
+const BOG_ORDER = ["A", "B", "C"];
+
+export default function TellerResetView() {
+  const [region, setRegion] = useState("O");
+  const [selectedBog, setSelectedBog] = useState("A");
+  const [activeBog, setActiveBog] = useState(null);
+  const [tellerNo, setTellerNo] = useState("");
+  const [result, setResult] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const getRetryOrder = (start) => {
+    const i = BOG_ORDER.indexOf(start);
+    return [...BOG_ORDER.slice(i), ...BOG_ORDER.slice(0, i)];
+  };
+
+  const attemptReset = async (bog) => {
+    setActiveBog(bog);
+
+    const res = await fetch("http://10.1.161.165:5050/tellerr", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        server: region,
+        bog,
+        teller_no: tellerNo,
+      }),
+    });
+
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.detail || "Failed");
+    }
+
+    const data = await res.json();
+    if (!data.extracted) throw new Error("No extracted");
+
+    return data;
+  };
+
+  const handleSubmit = async () => {
+    if (!tellerNo) {
+      setError("Please enter Teller Number");
+      return;
+    }
+
+    setLoading(true);
+    setError("");
+    setResult(null);
+
+    const order = getRetryOrder(selectedBog);
+
+    for (const bog of order) {
+      try {
+        const data = await attemptReset(bog);
+        setResult({
+          status: "OK",
+          bog: data.bog,
+          extracted: data.extracted,
+        });
+        setLoading(false);
+        return;
+      } catch {
+        continue;
+      }
+    }
+
+    setResult({ status: "FAILED", bog: "-", extracted: "-" });
+    setLoading(false);
+  };
+
+  return (
+    <div>
+      {/* Page Header (same as CIF) */}
+      <div style={styles.pageHeader}>
+        <div>
+          <h1 style={styles.pageTitle}>Teller Reset</h1>
+          <p style={styles.pageSubtitle}>
+            Auto retry across BOG A / B / C
+          </p>
+        </div>
+      </div>
+
+      {/* FORM CARD – EXACT CIF STRUCTURE */}
+      <div style={styles.formCard}>
+        {/* Inputs row */}
+        <div style={styles.formGrid}>
+          <div style={styles.formGroup}>
+            <label style={styles.label}>Region</label>
+            <select
+              value={region}
+              onChange={(e) => setRegion(e.target.value)}
+              style={styles.select}
+            >
+              <option value="X">X - UAT</option>
+              <option value="O">O - UAT</option>
+              <option value="Y">Y - UAT</option>
+              <option value="Z">Z - UAT</option>
+              <option value="K">K - Pre-Prod</option>
+              <option value="J">J - Pre-Prod</option>
+              <option value="Y2">Y2 - Pre-Prod</option>
+              <option value="L">L - Pre-Prod</option>
+            </select>
+          </div>
+
+          <div style={styles.formGroup}>
+            <label style={styles.label}>Teller Number</label>
+            <input
+              style={styles.input}
+              value={tellerNo}
+              onChange={(e) => setTellerNo(e.target.value)}
+              placeholder="Enter Teller Number"
+            />
+          </div>
+        </div>
+
+        {/* BOG buttons – same visual flow as CIF controls */}
+        <div
+          style={{
+            display: "flex",
+            gap: "12px",
+            marginTop: "16px",
+          }}
+        >
+          {BOG_ORDER.map((bog) => {
+            const selected = selectedBog === bog;
+            const active = activeBog === bog;
+
+            return (
+              <button
+                key={bog}
+                type="button"
+                disabled={loading}
+                onClick={() => setSelectedBog(bog)}
+                style={{
+                  ...styles.secondaryButton,
+                  backgroundColor: selected ? "#1976d2" : "#e0e0e0",
+                  color: selected ? "#fff" : "#000",
+                  boxShadow: active
+                    ? "0 0 0 3px rgba(46,125,50,0.35)"
+                    : "none",
+                }}
+              >
+                BOG {bog}
+              </button>
+            );
+          })}
+        </div>
+
+        {error && <div style={styles.errorMsg}>{error}</div>}
+
+        {/* FULL-WIDTH PRIMARY BUTTON – SAME AS CIF */}
+        <button
+          onClick={handleSubmit}
+          style={styles.primaryButton}
+          disabled={loading}
+        >
+          {loading ? "Processing..." : "Reset Teller"}
+        </button>
+      </div>
+
+      {/* RESULTS CARD – SAME AS CIF */}
+      {result && (
+        <div style={styles.resultsCard}>
+          <h3 style={styles.resultsTitle}>
+            {result.status === "OK"
+              ? "Teller Reset Successful"
+              : "Teller Reset Failed"}
+          </h3>
+
+          <div style={styles.resultItem}>
+            <div style={styles.resultContent}>
+              <p><strong>Status:</strong> {result.status}</p>
+              <p><strong>BOG Used:</strong> {result.bog}</p>
+              <p><strong>Extracted:</strong> {result.extracted}</p>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
