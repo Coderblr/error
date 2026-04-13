@@ -27,7 +27,11 @@ export default function CashDeposit() {
     const isFormValid = () => {
         const accountValid = account.length === 11;
         const amountValid = amount && parseFloat(amount) > 0;
-        const panValid = validatePAN(pan);
+        const amountThreshold = 50000;
+        
+        // PAN is only required if amount >= 50000
+        const panRequired = parseFloat(amount) >= amountThreshold;
+        const panValid = panRequired ? validatePAN(pan) : true;
 
         return accountValid && amountValid && panValid;
     };
@@ -40,6 +44,12 @@ export default function CashDeposit() {
     };
 
     const getPANError = () => {
+        const amountThreshold = 50000;
+        const panRequired = parseFloat(amount) >= amountThreshold;
+        
+        // Only validate if PAN is required
+        if (!panRequired) return null;
+        
         if (!pan) return null;
         if (pan.length < 10) {
             return `PAN format: ABCDP1234F (${pan.length}/10)`;
@@ -130,27 +140,34 @@ export default function CashDeposit() {
                         )}
                     </div>
 
-                    {/* PAN - Format: ABCDP1234F */}
-                    <div style={styles.formGroup}>
-                        <label style={styles.label}>PAN</label>
-                        <input
-                            type="text"
-                            maxLength={10}
-                            value={pan}
-                            onChange={(e) => {
-                                let value = e.target.value.toUpperCase();
-                                value = value.replace(/[^A-Z0-9]/g, "");
-                                setPan(value);
-                            }}
-                            style={styles.input}
-                            placeholder="Format: ABCDP1234F"
-                        />
-                        {getPANError() && (
-                            <div style={{ color: "#ff4444", fontSize: "12px", marginTop: "4px" }}>
-                                {getPANError()}
-                            </div>
-                        )}
-                    </div>
+                    {/* PAN - Format: ABCDP1234F - Only shows when amount >= 50000 */}
+                    {parseFloat(amount) >= 50000 && (
+                        <div style={styles.formGroup}>
+                            <label style={styles.label}>PAN</label>
+                            <input
+                                type="text"
+                                maxLength={10}
+                                value={pan}
+                                onChange={(e) => {
+                                    let value = e.target.value.toUpperCase(); // ✅ Auto-convert to uppercase
+                                    value = value.replace(/[^A-Z0-9]/g, ""); // Only allow letters and numbers
+                                    setPan(value);
+                                }}
+                                style={styles.input}
+                                placeholder="Format: ABCDP1234F"
+                            />
+                            {getPANError() && (
+                                <div style={{ color: "#ff4444", fontSize: "12px", marginTop: "4px" }}>
+                                    {getPANError()}
+                                </div>
+                            )}
+                        </div>
+                    )}
+                    
+                    {/* Empty placeholder when PAN is not shown - maintains grid layout */}
+                    {parseFloat(amount) < 50000 && (
+                        <div style={styles.formGroup}></div>
+                    )}
 
                     {/* Amount */}
                     <div style={styles.formGroup}>
@@ -158,13 +175,29 @@ export default function CashDeposit() {
                         <input
                             type="number"
                             value={amount}
-                            onChange={(e) => setAmount(e.target.value)}
+                            onChange={(e) => {
+                                setAmount(e.target.value);
+                                // Clear PAN if amount drops below 50000
+                                if (parseFloat(e.target.value) < 50000) {
+                                    setPan("");
+                                }
+                            }}
                             style={styles.input}
                             placeholder="Enter Amount"
                         />
                         {getAmountError() && (
                             <div style={{ color: "#ff4444", fontSize: "12px", marginTop: "4px" }}>
                                 {getAmountError()}
+                            </div>
+                        )}
+                        {amount && parseFloat(amount) < 50000 && (
+                            <div style={{ color: "#0066cc", fontSize: "12px", marginTop: "4px" }}>
+                                ℹ️ PAN not required for amounts below ₹50,000
+                            </div>
+                        )}
+                        {amount && parseFloat(amount) >= 50000 && (
+                            <div style={{ color: "#ff9900", fontSize: "12px", marginTop: "4px" }}>
+                                ⚠️ PAN will be required for amounts ≥ ₹50,000
                             </div>
                         )}
                     </div>
