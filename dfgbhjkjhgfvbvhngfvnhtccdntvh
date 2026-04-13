@@ -1,0 +1,270 @@
+"use client";
+import { useState } from "react";
+import { styles } from "../../styles/AppStyles";
+
+export default function CashDeposit() {
+    const [server, setServer] = useState("O");
+    const [account, setAccount] = useState("");
+    const [amount, setAmount] = useState("");
+    const [pan, setPan] = useState("");
+    const [response, setResponse] = useState(null);
+    const [error, setError] = useState("");
+
+    const BASE_URL = process.env.NEXT_PUBLIC_API_URL;
+
+    // ✅ Account Validation - Only 11 digits
+    const validateAccount = (value) => {
+        return /^\d{0,11}$/.test(value);
+    };
+
+    // ✅ PAN Validation - Format: ABCDP1234F (5 letters with P at position 4, 4 digits, 1 letter)
+    const validatePAN = (value) => {
+        const panRegex = /^[A-Z]{3}P[A-Z]\d{4}[A-Z]$/;
+        return panRegex.test(value);
+    };
+
+    // ✅ Check if all fields are filled and valid
+    const isFormValid = () => {
+        const accountValid = account.length === 11;
+        const amountValid = amount && parseFloat(amount) > 0;
+        const panValid = validatePAN(pan);
+
+        return accountValid && amountValid && panValid;
+    };
+
+    // ✅ Get validation errors
+    const getAccountError = () => {
+        if (!account) return null;
+        if (account.length < 11) return `Account must be 11 digits (${account.length}/11)`;
+        return null;
+    };
+
+    const getPANError = () => {
+        if (!pan) return null;
+        if (pan.length < 10) {
+            return `PAN format: ABCDP1234F (${pan.length}/10)`;
+        }
+        if (!validatePAN(pan)) {
+            return "PAN format invalid. Must be: 5 letters (4th is P) + 4 digits + 1 letter";
+        }
+        return null;
+    };
+
+    const getAmountError = () => {
+        if (!amount) return null;
+        if (parseFloat(amount) <= 0) return "Amount must be greater than 0";
+        return null;
+    };
+
+    const handleSubmit = async (event) => {
+        event.preventDefault();
+        setError("");
+        setResponse(null);
+
+        if (!isFormValid()) {
+            setError("Please fill all fields correctly");
+            return;
+        }
+
+        const url = `${BASE_URL}/cash_deposit`;
+
+        try {
+            const res = await fetch(url, {
+                credentials: "include",
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                    server: server,
+                    acc: account,
+                    amt: amount,
+                    pan: pan,
+                }),
+            });
+
+            const data = await res.json();
+            console.log(data);
+
+            setResponse(data);
+        } catch (err) {
+            console.error("Error:", err);
+            setError(err.message);
+        }
+    };
+
+    return (
+        <div>
+            <div style={styles.pageHeader}>
+                <div>
+                    <h1 style={styles.pageTitle}>Cash Deposit</h1>
+                    <p style={styles.pageSubtitle}>
+                        Deposit cash into your account securely
+                    </p>
+                </div>
+            </div>
+
+            <div style={styles.formCard}>
+                <div style={styles.formGrid}>
+
+                    {/* Account Number - Only 11 digits */}
+                    <div style={styles.formGroup}>
+                        <label style={styles.label}>Account Number</label>
+                        <input
+                            type="text"
+                            maxLength={11}
+                            value={account}
+                            onChange={(e) => {
+                                const value = e.target.value.replace(/\D/g, "");
+                                if (validateAccount(value)) {
+                                    setAccount(value);
+                                }
+                            }}
+                            style={styles.input}
+                            placeholder="Enter 11-digit Account"
+                        />
+                        {getAccountError() && (
+                            <div style={{ color: "#ff4444", fontSize: "12px", marginTop: "4px" }}>
+                                {getAccountError()}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* PAN - Format: ABCDP1234F */}
+                    <div style={styles.formGroup}>
+                        <label style={styles.label}>PAN</label>
+                        <input
+                            type="text"
+                            maxLength={10}
+                            value={pan}
+                            onChange={(e) => {
+                                let value = e.target.value.toUpperCase();
+                                value = value.replace(/[^A-Z0-9]/g, "");
+                                setPan(value);
+                            }}
+                            style={styles.input}
+                            placeholder="Format: ABCDP1234F"
+                        />
+                        {getPANError() && (
+                            <div style={{ color: "#ff4444", fontSize: "12px", marginTop: "4px" }}>
+                                {getPANError()}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Amount */}
+                    <div style={styles.formGroup}>
+                        <label style={styles.label}>Amount</label>
+                        <input
+                            type="number"
+                            value={amount}
+                            onChange={(e) => setAmount(e.target.value)}
+                            style={styles.input}
+                            placeholder="Enter Amount"
+                        />
+                        {getAmountError() && (
+                            <div style={{ color: "#ff4444", fontSize: "12px", marginTop: "4px" }}>
+                                {getAmountError()}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Server */}
+                    <div style={styles.formGroup}>
+                        <label style={styles.label}>Server</label>
+                        <select
+                            value={server}
+                            onChange={(e) => setServer(e.target.value)}
+                            style={styles.select}
+                        >
+                            <option value="">Select Region</option>
+                            <option value="O">O - UAT</option>
+                            <option value="Y">Y - UAT</option>
+                            <option value="Z">Z - UAT</option>
+                            <option value="K">K - Pre-Prod</option>
+                            <option value="R1">R1 - Pre-Prod</option>
+                            <option value="Y2">Y2 - Pre-Prod</option>
+                            <option value="L">L - Pre-Prod</option>
+                        </select>
+                    </div>
+
+                </div>
+
+                {error && (
+                    <div style={styles.errorMsg}>
+                        {error}
+                    </div>
+                )}
+
+                <button
+                    onClick={handleSubmit}
+                    disabled={!isFormValid()}
+                    style={{
+                        ...styles.primaryButton,
+                        opacity: isFormValid() ? 1 : 0.5,
+                        cursor: isFormValid() ? "pointer" : "not-allowed"
+                    }}
+                >
+                    {isFormValid() ? "Deposit Now" : "Fill all fields to continue"}
+                </button>
+            </div>
+
+            {response && (
+                <div style={styles.resultsCard}>
+                    <div style={styles.resultsHeader}>
+                        <h3 style={styles.resultsTitle}>Deposit Result</h3>
+                    </div>
+
+                    <div style={styles.resultsList}>
+                        <div style={styles.resultItem}>
+                            <div style={styles.resultNumber}>1</div>
+                            <div style={styles.resultContent}>
+                                <div>
+                                    <span style={styles.resultLabel}><b>Server : </b></span>
+                                    <span style={styles.resultValue}>
+                                        {response.server}
+                                    </span>
+                                </div>
+
+                                <div>
+                                    <span style={styles.resultLabel}><b>Account : </b></span>
+                                    <span style={styles.resultValue}>
+                                        {response.acc || account}
+                                    </span>
+                                </div>
+
+                                <div>
+                                    <span style={styles.resultLabel}><b>Amount : </b></span>
+                                    <span style={styles.resultValue}>
+                                        {response.amt || amount}
+                                    </span>
+                                </div>
+
+                                <div>
+                                    <span style={styles.resultLabel}><b>PAN : </b></span>
+                                    <span style={styles.resultValue}>
+                                        {response.pan || pan}
+                                    </span>
+                                </div>
+
+                                <div style={{ marginTop: "10px" }}>
+                                    {response.parsed &&
+                                        Object.entries(response.parsed)
+                                            .filter(([key]) => key === "status" || key === "result" ||
+                                                key === "error_code" || key === "error_description"
+                                            )
+                                            .map(([key, value]) => (
+                                                <div key={key} style={{ marginBottom: "6px" }}>
+                                                    <b> {key}:</b> {String(value)}
+                                                </div>
+                                            ))
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}
